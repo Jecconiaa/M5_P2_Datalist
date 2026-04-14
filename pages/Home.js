@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, FlatList, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, FlatList, Alert, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Data Awal (Initial State)
@@ -18,9 +18,12 @@ const Home = () => {
   // 3. STATE UNTUK JAM DIGITAL
   const [currentTime, setCurrentTime] = useState("Memuat jam...");
 
+  // 4. STATE & REF UNTUK CATATAN (Baru)
+  const [note, setNote] = useState("");
+  const noteInputRef = useRef(null); // Membuat "kait" kosong untuk elemen input
+
   // EFEK SIKLUS HIDUP (Jam Real-time)
   useEffect(() => {
-    // Jalankan timer setiap 1000 milidetik (1 detik)
     const timer = setInterval(() => {
       const timeString = new Date().toLocaleTimeString('id-ID', {
         hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -28,26 +31,43 @@ const Home = () => {
       setCurrentTime(timeString);
     }, 1000);
 
-    // CLEANUP: Matikan timer jika layar ditutup
     return () => clearInterval(timer);
-  }, []); // Array kosong artinya jalankan hanya satu kali saat awal dibuka
+  }, []);
 
-  // FUNGSI LOGIKA ABSEN
+  // 5. OPTIMASI KOMPUTASI DENGAN useMemo (Baru)
+  const attendanceStats = useMemo(() => {
+    // Teks ini HANYA akan tercetak di terminal jika historyData bertambah, bukan setiap detik!
+    console.log("Menghitung ulang statistik kehadiran...");
+    
+    const presentCount = historyData.filter(item => item.status === 'Present').length;
+    const absentCount = historyData.filter(item => item.status === 'Absent').length;
+    
+    return { totalPresent: presentCount, totalAbsent: absentCount };
+  }, [historyData]); // Hanya hitung ulang kalau historyData berubah
+
+  // FUNGSI LOGIKA ABSEN (Diperbarui)
   const handleCheckIn = () => {
     if (isCheckedIn) {
-      Alert.alert("Perhatian", "Anda sudah melakukan Check In untuk kelas ini.");
+      Alert.alert("Perhatian", "Anda sudah melakukan Check In.");
+      return;
+    }
+
+    // Validasi Catatan menggunakan useRef
+    if (note.trim() === '') {
+      Alert.alert("Peringatan", "Catatan kehadiran wajib diisi!");
+      noteInputRef.current.focus(); // Sihir useRef: Memaksa kursor pindah ke input
       return;
     }
 
     // 1. Buat data presensi baru
     const newAttendance = {
-      id: Date.now().toString(), // Buat ID unik dari timestamp
+      id: Date.now().toString(),
       course: "Mobile Programming",
-      date: new Date().toLocaleDateString('id-ID'), // Tanggal hari ini
-      status: "Present"
+      date: new Date().toLocaleDateString('id-ID'),
+      status: "Present",
     };
 
-    // 2. Masukkan data baru ke urutan paling atas daftar history
+    // 2. Masukkan data baru ke urutan paling atas daftar
     setHistoryData([newAttendance, ...historyData]);
     
     // 3. Kunci tombol Check In
@@ -55,7 +75,7 @@ const Home = () => {
     Alert.alert("Sukses", `Berhasil Check In pada pukul ${currentTime}`);
   };
 
-  // Tampilan per-item untuk daftar history (Bawaan W2 yang disesuaikan)
+  // Tampilan per-item untuk daftar history
   const renderItem = ({ item }) => (
     <View style={styles.historyItem}>
       <View>
@@ -97,16 +117,39 @@ const Home = () => {
           <Text>08:00 - 10:00</Text>
           <Text>Lab 3</Text>
 
-          {/* Modifikasi Tombol Check In */}
+          {/* Kolom Input Catatan dengan useRef (Hanya muncul jika belum absen) */}
+          {!isCheckedIn && (
+            <TextInput
+              ref={noteInputRef} // Menempelkan referensi ke elemen ini
+              style={styles.inputCatatan}
+              placeholder="Tulis catatan (cth: Hadir lab)"
+              value={note}
+              onChangeText={setNote}
+            />
+          )}
+
+          {/* Tombol Check In */}
           <TouchableOpacity
             style={[styles.button, isCheckedIn ? styles.buttonDisabled : styles.buttonActive]}
             onPress={handleCheckIn}
-            disabled={isCheckedIn} // Matikan fungsi klik jika sudah absen
+            disabled={isCheckedIn}
           >
             <Text style={styles.buttonText}>
               {isCheckedIn ? "CHECKED IN" : "CHECK IN"}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Fitur Baru: Statistik Kehadiran (Hasil useMemo) */}
+        <View style={styles.statsCard}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{attendanceStats.totalPresent}</Text>
+            <Text style={styles.statLabel}>Total Present</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={[styles.statNumber, { color: 'red' }]}>{attendanceStats.totalAbsent}</Text>
+            <Text style={styles.statLabel}>Total Absent</Text>
+          </View>
         </View>
 
         {/* Attendance History */}
@@ -125,109 +168,53 @@ const Home = () => {
   );
 };
 
+// Styling Gabungan
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5"
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20
-  },
-  card: {
-    flexDirection: "row",
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20
-  },
-  icon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#eee",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 15
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: "bold"
-  },
-  classCard: {
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10
-  },
-  button: {
-    marginTop: 10,
-    backgroundColor: "#007AFF",
+  container: { flex: 1, backgroundColor: '#f2f2f2' },
+  content: { padding: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  title: { fontSize: 24, fontWeight: 'bold' },
+  clockText: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', fontVariant: ['tabular-nums'] },
+  card: { flexDirection: 'row', backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, elevation: 2, alignItems: 'center' },
+  icon: { backgroundColor: '#e0e0e0', padding: 10, borderRadius: 30, marginRight: 15 },
+  name: { fontSize: 18, fontWeight: 'bold' },
+  classCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, marginBottom: 20, elevation: 2 },
+  subtitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  
+  // Style Kolom Input Baru
+  inputCatatan: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
     padding: 10,
-    borderRadius: 8,
-    alignItems: "center"
+    marginTop: 15,
+    backgroundColor: '#fafafa',
   },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold"
-  },
-  summaryCard: {
-    backgroundColor: "white",
+
+  button: { padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 15 },
+  buttonActive: { backgroundColor: '#007AFF' },
+  buttonDisabled: { backgroundColor: '#ABC4FF' },
+  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+  // Style Statistik Baru
+  statsCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: 'white',
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
-    flexDirection: "row",
-    justifyContent: "space-around"
   },
-  presentText: {
-    fontSize: 16,
-    color: "green",
-    fontWeight: "bold"
-  },
-  absentText: {
-    fontSize: 16,
-    color: "red",
-    fontWeight: "bold"
-  },
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10
-  },
-  course: {
-    fontSize: 16,
-    fontWeight: "bold"
-  },
-  date: {
-    fontSize: 12,
-    color: "gray",
-    marginTop: 5
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  present: {
-    color: "green",
-    fontWeight: "bold"
-  },
-  absent: {
-    color: "red",
-    fontWeight: "bold"
-  }
+  statBox: { alignItems: 'center' },
+  statNumber: { fontSize: 24, fontWeight: 'bold', color: 'green' },
+  statLabel: { fontSize: 14, color: 'gray' },
+
+  historyItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  historyCourse: { fontSize: 16, fontWeight: '500' },
+  historyDate: { color: 'gray', fontSize: 12, marginTop: 4 },
+  historyStatus: { fontWeight: 'bold', fontSize: 14 },
+  statusPresent: { color: 'green' },
+  statusAbsent: { color: 'red' }
 });
 
 export default Home;
