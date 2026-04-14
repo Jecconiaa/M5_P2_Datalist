@@ -1,108 +1,125 @@
-import React from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, FlatList } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons"; 
+import React, { useState, useEffect } from 'react';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, FlatList, Alert } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
-
-const history = [
-  { id: "1", course: "Mobile Programming", date: "2026-03-01", status: "Present" },
-  { id: "2", course: "Database System", date: "2026-03-02", status: "Present" },
-  { id: "3", course: "Operating System", date: "2026-03-03", status: "Absent" },
-  { id: "4", course: "Computer Network", date: "2026-03-04", status: "Present" },
-  { id: "5", course: "Web Programming", date: "2026-03-05", status: "Present" },
-  { id: "6", course: "Software Engineering", date: "2026-03-06", status: "Present" },
-  { id: "7", course: "Data Structure", date: "2026-03-07", status: "Present" },
-  { id: "8", course: "Algorithm", date: "2026-03-08", status: "Absent" },
-  { id: "9", course: "Mobile Programming", date: "2026-03-09", status: "Present" },
-  { id: "10", course: "Database System", date: "2026-03-10", status: "Present" },
-  { id: "11", course: "Operating System", date: "2026-03-11", status: "Present" },
-  { id: "12", course: "Computer Network", date: "2026-03-12", status: "Absent" },
-  { id: "13", course: "Web Programming", date: "2026-03-13", status: "Present" },
-  { id: "14", course: "Software Engineering", date: "2026-03-14", status: "Present" },
-  { id: "15", course: "Data Structure", date: "2026-03-15", status: "Absent" },
-  { id: "16", course: "Algorithm", date: "2026-03-16", status: "Present" },
-  { id: "17", course: "Mobile Programming", date: "2026-03-17", status: "Present" },
-  { id: "18", course: "Database System", date: "2026-03-18", status: "Absent" },
-  { id: "19", course: "Operating System", date: "2026-03-19", status: "Present" },
-  { id: "20", course: "Computer Network", date: "2026-03-20", status: "Present" },
-  { id: "21", course: "Web Programming", date: "2026-03-21", status: "Present" },
-  { id: "22", course: "Software Engineering", date: "2026-03-22", status: "Present" },
-  { id: "23", course: "Data Structure", date: "2026-03-23", status: "Present" },
-  { id: "24", course: "Algorithm", date: "2026-03-24", status: "Absent" },
+// Data Awal (Initial State)
+const initialHistory = [
+  { id: "1", course: "Web Programming", date: "2026-03-01", status: "Absent" },
+  { id: "2", course: "Database System", date: "2026-03-02", status: "Present" }
 ];
 
 const Home = () => {
+  // 1. STATE UNTUK RIWAYAT PRESENSI
+  const [historyData, setHistoryData] = useState(initialHistory);
+  
+  // 2. STATE UNTUK STATUS TOMBOL CHECK-IN
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  
+  // 3. STATE UNTUK JAM DIGITAL
+  const [currentTime, setCurrentTime] = useState("Memuat jam...");
 
-  const presentCount = history.filter(item => item.status === "Present").length;
-  const absentCount = history.filter(item => item.status === "Absent").length;
+  // EFEK SIKLUS HIDUP (Jam Real-time)
+  useEffect(() => {
+    // Jalankan timer setiap 1000 milidetik (1 detik)
+    const timer = setInterval(() => {
+      const timeString = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      setCurrentTime(timeString);
+    }, 1000);
 
+    // CLEANUP: Matikan timer jika layar ditutup
+    return () => clearInterval(timer);
+  }, []); // Array kosong artinya jalankan hanya satu kali saat awal dibuka
+
+  // FUNGSI LOGIKA ABSEN
+  const handleCheckIn = () => {
+    if (isCheckedIn) {
+      Alert.alert("Perhatian", "Anda sudah melakukan Check In untuk kelas ini.");
+      return;
+    }
+
+    // 1. Buat data presensi baru
+    const newAttendance = {
+      id: Date.now().toString(), // Buat ID unik dari timestamp
+      course: "Mobile Programming",
+      date: new Date().toLocaleDateString('id-ID'), // Tanggal hari ini
+      status: "Present"
+    };
+
+    // 2. Masukkan data baru ke urutan paling atas daftar history
+    setHistoryData([newAttendance, ...historyData]);
+    
+    // 3. Kunci tombol Check In
+    setIsCheckedIn(true);
+    Alert.alert("Sukses", `Berhasil Check In pada pukul ${currentTime}`);
+  };
+
+  // Tampilan per-item untuk daftar history (Bawaan W2 yang disesuaikan)
   const renderItem = ({ item }) => (
-    <View style={styles.item}>
+    <View style={styles.historyItem}>
       <View>
-        <Text style={styles.course}>{item.course}</Text>
-        <Text style={styles.date}>{item.date}</Text>
+        <Text style={styles.historyCourse}>{item.course}</Text>
+        <Text style={styles.historyDate}>{item.date}</Text>
       </View>
-      <View style={styles.statusContainer}>
-
-        <MaterialIcons 
-          name={item.status === "Present" ? "check-circle" : "cancel"} 
-          size={18} 
-          color={item.status === "Present" ? "green" : "red"} 
-          style={{ marginRight: 4 }}
-        />
-        <Text style={item.status === "Present" ? styles.present : styles.absent}>
-          {item.status}
-        </Text>
-      </View>
+      <Text style={[styles.historyStatus, item.status === 'Absent' ? styles.statusAbsent : styles.statusPresent]}>
+        {item.status}
+      </Text>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Attendance App</Text>
+        
+        {/* Header Jam */}
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Attendance App</Text>
+          <Text style={styles.clockText}>{currentTime}</Text>
+        </View>
 
+        {/* Student Card */}
         <View style={styles.card}>
           <View style={styles.icon}>
             <MaterialIcons name="person" size={40} color="#555" />
           </View>
           <View>
-            <Text style={styles.name}>Bev</Text>
-            <Text>NIM: 12345678</Text> 
+            <Text style={styles.name}>Bevin Jeconia Clarence Suryaatmaja</Text>
+            <Text>NIM: 0920240014</Text>
             <Text>Class: Informatika-2B</Text>
           </View>
         </View>
 
+        {/* Today's Class */}
         <View style={styles.classCard}>
           <Text style={styles.subtitle}>Today's Class</Text>
           <Text>Mobile Programming</Text>
           <Text>08:00 - 10:00</Text>
           <Text>Lab 3</Text>
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>CHECK IN</Text>
+
+          {/* Modifikasi Tombol Check In */}
+          <TouchableOpacity
+            style={[styles.button, isCheckedIn ? styles.buttonDisabled : styles.buttonActive]}
+            onPress={handleCheckIn}
+            disabled={isCheckedIn} // Matikan fungsi klik jika sudah absen
+          >
+            <Text style={styles.buttonText}>
+              {isCheckedIn ? "CHECKED IN" : "CHECK IN"}
+            </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Attendance History */}
         <View style={styles.classCard}>
-          <Text style={styles.subtitle}>Upcoming Class</Text>
-          <Text>Business Process Management</Text>
-          <Text>10:30 - 12:30</Text>
-          <Text>Lab 4</Text>
+          <Text style={styles.subtitle}>Attendance History</Text>
+          <FlatList
+            data={historyData}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            scrollEnabled={false}
+          />
         </View>
 
-
-        <Text style={styles.subtitle}>Attendance Summary</Text>
-        <View style={styles.summaryCard}>
-          <Text style={styles.presentText}>Present: {presentCount}</Text>
-          <Text style={styles.absentText}>Absent: {absentCount}</Text>
-        </View>
-
-        <Text style={styles.subtitle}>Attendance History</Text>
-        <FlatList
-          data={history}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          scrollEnabled={false}
-        />
       </ScrollView>
     </SafeAreaView>
   );
